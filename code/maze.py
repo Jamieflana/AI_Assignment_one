@@ -2,13 +2,15 @@
 import random
 
 # Easy to read representation for each cardinal direction.
-N, S, W, E = ('n', 's', 'w', 'e')
+N, S, W, E = ("n", "s", "w", "e")
+
 
 class Cell(object):
     """
     Class for each individual cell. Knows only its position and which walls are
     still standing.
     """
+
     def __init__(self, x, y, walls):
         self.x = x
         self.y = y
@@ -16,7 +18,7 @@ class Cell(object):
 
     def __repr__(self):
         # <15, 25 (es  )>
-        return '<{}, {} ({:4})>'.format(self.x, self.y, ''.join(sorted(self.walls)))
+        return "<{}, {} ({:4})>".format(self.x, self.y, "".join(sorted(self.walls)))
 
     def __contains__(self, item):
         # N in cell
@@ -33,7 +35,9 @@ class Cell(object):
         Returns the direction to the given cell from the current one.
         Must be one cell away only.
         """
-        assert abs(self.x - other.x) + abs(self.y - other.y) == 1, '{}, {}'.format(self, other)
+        assert abs(self.x - other.x) + abs(self.y - other.y) == 1, "{}, {}".format(
+            self, other
+        )
         if other.y < self.y:
             return N
         elif other.y > self.y:
@@ -52,27 +56,30 @@ class Cell(object):
         other.walls.remove(other._wall_to(self))
         self.walls.remove(self._wall_to(other))
 
+
 class Maze(object):
     """
     Maze class containing full board and maze generation algorithms.
     """
 
     # Unicode character for a wall with other walls in the given directions.
-    UNICODE_BY_CONNECTIONS = {'ensw': '┼',
-                              'ens': '├',
-                              'enw': '┴',
-                              'esw': '┬',
-                              'es': '┌',
-                              'en': '└',
-                              'ew': '─',
-                              'e': '╶',
-                              'nsw': '┤',
-                              'ns': '│',
-                              'nw': '┘',
-                              'sw': '┐',
-                              's': '╷',
-                              'n': '╵',
-                              'w': '╴'}
+    UNICODE_BY_CONNECTIONS = {
+        "ensw": "┼",
+        "ens": "├",
+        "enw": "┴",
+        "esw": "┬",
+        "es": "┌",
+        "en": "└",
+        "ew": "─",
+        "e": "╶",
+        "nsw": "┤",
+        "ns": "│",
+        "nw": "┘",
+        "sw": "┐",
+        "s": "╷",
+        "n": "╵",
+        "w": "╴",
+    }
 
     def __init__(self, width=20, height=10):
         """
@@ -124,17 +131,16 @@ class Maze(object):
         O     O   O
         OOOOOOOOOOO
         """
-        str_matrix = [['O'] * (self.width * 2 + 1)
-                      for i in range(self.height * 2 + 1)]
+        str_matrix = [["O"] * (self.width * 2 + 1) for i in range(self.height * 2 + 1)]
 
         for cell in self.cells:
             x = cell.x * 2 + 1
             y = cell.y * 2 + 1
-            str_matrix[y][x] = ' '
+            str_matrix[y][x] = " "
             if N not in cell and cell.y > 0:
-                str_matrix[y - 1][x + 0] = ' '
+                str_matrix[y - 1][x + 0] = " "
             if W not in cell and cell.x > 0:
-                str_matrix[y][x - 1] = ' '
+                str_matrix[y][x - 1] = " "
 
         return str_matrix
 
@@ -180,7 +186,7 @@ class Maze(object):
             This is a temporary helper function.
             """
             if 0 <= x < len(matrix[0]) and 0 <= y < len(matrix):
-                return matrix[y][x] != ' '
+                return matrix[y][x] != " "
             else:
                 return False
 
@@ -189,7 +195,7 @@ class Maze(object):
         for y, line in enumerate(matrix):
             for x, char in enumerate(line):
                 if not g(x, y) and g(x - 1, y):
-                    matrix[y][x - 1] = ' '
+                    matrix[y][x - 1] = " "
 
         # Right now the maze has the correct aspect ratio, but is still using
         # 'O' to represent walls.
@@ -202,18 +208,22 @@ class Maze(object):
                     continue
 
                 connections = set((N, S, E, W))
-                if not g(x, y + 1): connections.remove(S)
-                if not g(x, y - 1): connections.remove(N)
-                if not g(x + 1, y): connections.remove(E)
-                if not g(x - 1, y): connections.remove(W)
+                if not g(x, y + 1):
+                    connections.remove(S)
+                if not g(x, y - 1):
+                    connections.remove(N)
+                if not g(x + 1, y):
+                    connections.remove(E)
+                if not g(x - 1, y):
+                    connections.remove(W)
 
-                str_connections = ''.join(sorted(connections))
+                str_connections = "".join(sorted(connections))
                 # Note we are changing the matrix we are reading. We need to be
                 # careful as to not break the `g` function implementation.
                 matrix[y][x] = Maze.UNICODE_BY_CONNECTIONS[str_connections]
 
         # Simple double join to transform list of lists into string.
-        return '\n'.join(''.join(line) for line in matrix) + '\n'
+        return "\n".join("".join(line) for line in matrix) + "\n"
 
     def randomize(self):
         """
