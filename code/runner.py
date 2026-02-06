@@ -1,5 +1,6 @@
 import random
 
+from search_algorithms.BFS import BFS
 from maze import Maze
 from search_algorithms.DFS import DFS
 
@@ -21,9 +22,16 @@ goal = (width - 1, height - 1)
 print(f"Maze size: {width}x{height} | loop_prob={loop_prob:.2f} | solvable={solvable}")
 # print(maze)
 
-searcher = DFS()
-path = searcher.solve(maze, start, goal)
+DFS_searcher = DFS()
+path = DFS_searcher.solve(maze, start, goal)
 if path is not None:
     print("Solution found")
 else:
     print("Solution not found")
+
+BFS_searcher = BFS()
+path = BFS_searcher.solve(maze, start, goal)
+if path is not None:
+    print("BFS SOlution found")
+else:
+    print("NO BFS solution found")

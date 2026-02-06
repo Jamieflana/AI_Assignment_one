@@ -6,10 +6,8 @@ class DFS(BaseSearch):
         super().__init__()
 
     def _search(self, maze, start, goal):
-        sx, sy = start
-        gx, gy = goal
-        start_cell = maze[sx, sy]
-        goal_cell = maze[gx, gy]
+        start_cell = maze[start]
+        goal_cell = maze[goal]
         if start_cell is None or goal_cell is None:
             return None
 
