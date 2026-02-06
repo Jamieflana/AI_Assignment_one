@@ -220,25 +220,31 @@ class Maze(object):
                 str_connections = "".join(sorted(connections))
                 # Note we are changing the matrix we are reading. We need to be
                 # careful as to not break the `g` function implementation.
-                matrix[y][x] = Maze.UNICODE_BY_CONNECTIONS[str_connections]
+                # If an isolated wall occurs (no adjacent wall connections),
+                # fall back to a simple wall character.
+                if str_connections:
+                    matrix[y][x] = Maze.UNICODE_BY_CONNECTIONS[str_connections]
+                else:
+                    matrix[y][x] = "│"
 
         # Simple double join to transform list of lists into string.
         return "\n".join("".join(line) for line in matrix) + "\n"
 
-    def randomize(self):
+    def randomize(self, rng=None):
         """
         Knocks down random walls to build a random perfect maze.
 
         Algorithm from http://mazeworks.com/mazegen/mazetut/index.htm
         """
+        rand = rng if rng is not None else random
         cell_stack = []
-        cell = random.choice(self.cells)
+        cell = rand.choice(self.cells)
         n_visited_cells = 1
 
         while n_visited_cells < len(self.cells):
             neighbors = [c for c in self.neighbors(cell) if c.is_full()]
             if len(neighbors):
-                neighbor = random.choice(neighbors)
+                neighbor = rand.choice(neighbors)
                 cell.connect(neighbor)
                 cell_stack.append(cell)
                 cell = neighbor
@@ -246,11 +252,185 @@ class Maze(object):
             else:
                 cell = cell_stack.pop()
 
+    def add_loops(self, loop_prob=0.05, rng=None):
+        """
+        Adds extra openings to a perfect maze to create loops (imperfect maze).
+
+        loop_prob controls the probability of removing a wall between two
+        adjacent cells. Uses only E/S neighbors to avoid double-processing.
+        """
+        if loop_prob <= 0:
+            return
+
+        rand = rng if rng is not None else random
+        for cell in self.cells:
+            for neighbor in self.neighbors(cell):
+                # Only consider east/south to avoid processing each wall twice.
+                if neighbor.x < cell.x or neighbor.y < cell.y:
+                    continue
+
+                wall_dir = cell._wall_to(neighbor)
+                if wall_dir in cell.walls and rand.random() < loop_prob:
+                    cell.connect(neighbor)
+
     @staticmethod
-    def generate(width=20, height=10):
+    def generate(
+        width=20,
+        height=10,
+        loop_prob=0.05,
+        solvable=True,
+        start=(0, 0),
+        goal=None,
+        max_block_attempts=200,
+        rng=None,
+    ):
         """
-        Returns a new random perfect maze with the given sizes.
+        Returns a new random maze with the given sizes.
+        loop_prob > 0 will create loops by removing extra walls.
+
+        solvable:
+            True  -> ensure a path exists between start and goal.
+            False -> try to remove any path between start and goal.
+            None  -> do not enforce either way.
         """
+        if goal is None:
+            goal = (width - 1, height - 1)
         m = Maze(width, height)
-        m.randomize()
+        m.randomize(rng=rng)
+        m.add_loops(loop_prob=loop_prob, rng=rng)
+        if solvable is False:
+            m.block_path(start, goal, max_attempts=max_block_attempts, rng=rng)
+        elif solvable is True:
+            # Perfect mazes are already solvable; this is a safety check in case
+            # any later changes add walls.
+            if not m.path_exists(start, goal):
+                m.randomize(rng=rng)
+                m.add_loops(loop_prob=loop_prob, rng=rng)
         return m
+
+    @staticmethod
+    def generate_many(
+        sizes, loop_prob=0.05, solvable=True, start=(0, 0), goal=None, rng=None
+    ):
+        """
+        Returns a list of mazes for the given (width, height) sizes.
+        """
+        mazes = []
+        for width, height in sizes:
+            mazes.append(
+                Maze.generate(
+                    width=width,
+                    height=height,
+                    loop_prob=loop_prob,
+                    solvable=solvable,
+                    start=start,
+                    goal=goal,
+                    rng=rng,
+                )
+            )
+        return mazes
+
+    def neighbors_open(self, cell):
+        """
+        Returns neighbors that are reachable (no wall between).
+        """
+        for neighbor in self.neighbors(cell):
+            if cell._wall_to(neighbor) not in cell.walls:
+                yield neighbor
+
+    def _coerce_cell(self, pos):
+        if isinstance(pos, Cell):
+            return pos
+        if pos is None:
+            return None
+        x, y = pos
+        return self[x, y]
+
+    def path_exists(self, start, goal):
+        """
+        Returns True if there is a path between start and goal.
+        """
+        start_cell = self._coerce_cell(start)
+        goal_cell = self._coerce_cell(goal)
+        if start_cell is None or goal_cell is None:
+            return False
+        if start_cell == goal_cell:
+            return True
+
+        queue = [start_cell]
+        visited = set([(start_cell.x, start_cell.y)])
+        while queue:
+            cell = queue.pop(0)
+            if cell.x == goal_cell.x and cell.y == goal_cell.y:
+                return True
+            for nb in self.neighbors_open(cell):
+                key = (nb.x, nb.y)
+                if key not in visited:
+                    visited.add(key)
+                    queue.append(nb)
+        return False
+
+    def find_path(self, start, goal):
+        """
+        Returns one path between start and goal as a list of cells, or None.
+        """
+        start_cell = self._coerce_cell(start)
+        goal_cell = self._coerce_cell(goal)
+        if start_cell is None or goal_cell is None:
+            return None
+        if start_cell == goal_cell:
+            return [start_cell]
+
+        queue = [start_cell]
+        parent = {(start_cell.x, start_cell.y): None}
+        visited = set([(start_cell.x, start_cell.y)])
+
+        while queue:
+            cell = queue.pop(0)
+            if cell.x == goal_cell.x and cell.y == goal_cell.y:
+                break
+            for nb in self.neighbors_open(cell):
+                key = (nb.x, nb.y)
+                if key not in visited:
+                    visited.add(key)
+                    parent[key] = (cell.x, cell.y)
+                    queue.append(nb)
+        else:
+            return None
+
+        path = []
+        cur = (goal_cell.x, goal_cell.y)
+        while cur is not None:
+            cell = self[cur]
+            path.append(cell)
+            cur = parent[cur]
+        path.reverse()
+        return path
+
+    def add_wall(self, cell, neighbor):
+        """
+        Adds a wall between two adjacent cells.
+        """
+        wall_dir = cell._wall_to(neighbor)
+        cell.walls.add(wall_dir)
+        neighbor.walls.add(neighbor._wall_to(cell))
+
+    def block_path(self, start, goal, max_attempts=200, rng=None):
+        """
+        Tries to remove all paths between start and goal by adding walls.
+        Returns True if no path remains.
+        """
+        rand = rng if rng is not None else random
+        for _ in range(max_attempts):
+            path = self.find_path(start, goal)
+            if not path:
+                return True
+            if len(path) < 2:
+                return False
+
+            idx = rand.randrange(len(path) - 1)
+            cell = path[idx]
+            neighbor = path[idx + 1]
+            self.add_wall(cell, neighbor)
+
+        return not self.path_exists(start, goal)

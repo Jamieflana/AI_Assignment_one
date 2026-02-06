@@ -1,13 +1,29 @@
+import random
+
 from maze import Maze
 from search_algorithms.DFS import DFS
 
-width, height = 5, 5
+# Random size between 5x5 and 50x50 (inclusive).
+width = random.randint(10, 10)
+height = random.randint(10, 10)
 
-maze = Maze.generate(width, height)
-start = maze[0, 0]
-goal = maze[width - 1, height - 1]
+# Random loop probability to allow multiple paths.
+loop_prob = random.uniform(0.05, 0.30)
 
-dfs = DFS()
-path, metrics = dfs.solve(maze, start, goal)
-print(path)
-print(metrics)
+# Chance to force an unsolvable maze.
+unsolvable_prob = 0.30
+solvable = False if random.random() < unsolvable_prob else True
+
+maze = Maze.generate(width, height, loop_prob=loop_prob, solvable=solvable)
+start = (0, 0)
+goal = (width - 1, height - 1)
+
+print(f"Maze size: {width}x{height} | loop_prob={loop_prob:.2f} | solvable={solvable}")
+# print(maze)
+
+searcher = DFS()
+path = searcher.solve(maze, start, goal)
+if path is not None:
+    print("Solution found")
+else:
+    print("Solution not found")
